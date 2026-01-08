@@ -52,18 +52,15 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- [2] 구글 시트 연결 함수 (에러 방지 기능 추가!) ---
+# --- [2] 구글 시트 연결 함수 ---
 def get_google_sheet(sheet_name):
     try:
-        # 1. 클라우드 환경인지 확인 (비밀금고가 있는지 시도)
         if "gcp_service_account" in st.secrets:
             creds_dict = st.secrets["gcp_service_account"]
             gc = gspread.service_account_from_dict(creds_dict)
         else:
-            # 금고는 있는데 키가 없는 경우 (거의 없음)
             gc = gspread.service_account(filename='service_account.json')
     except Exception:
-        # 2. 내 컴퓨터라서 비밀금고 파일 자체가 없는 경우 -> 그냥 내 파일 씀
         gc = gspread.service_account(filename='service_account.json')
         
     doc = gc.open("경인여대 스마트회의 DB")
@@ -83,31 +80,21 @@ with st.sidebar:
 # --- [4] 기능 1: 금주 현황 (Current) ---
 if menu == "📊 금주 현황 (Current)":
     
-    # ---------------------------------------------------------
-    # [스마트 배너 기능] 시간에 따라 다른 사진 보여주기
-    # ---------------------------------------------------------
-    current_hour = datetime.now().hour # 현재 시간(시) 가져오기 (0~23)
-
-    # 아침 6시부터 저녁 6시(18시) 전까지는 '주간 사진'
+    # [스마트 배너]
+    current_hour = datetime.now().hour 
     if 6 <= current_hour < 18:
         banner_image = "campus_day.png"
         caption_text = "경인여자대학교의 힘찬 하루"
-    # 그 외 시간(밤)에는 '야간 사진'
     else:
         banner_image = "campus_night.png"
         caption_text = "경인여자대학교의 빛나는 열정"
 
-    # 사진 띄우기 (에러 방지 처리)
     try:
-        # use_container_width=True: 화면 가로폭에 꽉 차게
         st.image(banner_image, use_container_width=True, caption=caption_text)
     except:
-        # 만약 사진 파일이 없어도 에러 없이 넘어감
         pass
-    # ---------------------------------------------------------
 
     st.markdown('<div class="main-header">🎓 대학혁신 주간 업무보고</div>', unsafe_allow_html=True)
-    # ... (이 아래는 기존 코드와 동일) ...
     st.markdown(f'<div class="sub-header">📅 기준일: {datetime.now().strftime("%Y년 %m월 %d일")} | 종이 없는 스마트 회의 시스템</div>', unsafe_allow_html=True)
     
     try:
@@ -129,7 +116,25 @@ if menu == "📊 금주 현황 (Current)":
             selected_dept = st.multiselect("부서 필터:", dept_list, default=dept_list)
             filtered_df = df[df['부서명'].isin(selected_dept)]
             
-            st.dataframe(filtered_df, use_container_width=True, hide_index=True)
+            # --- [수정된 부분] 표 디자인 개선 시작 ---
+            st.dataframe(
+                filtered_df, 
+                use_container_width=True, 
+                hide_index=True,
+                column_config={
+                    "입력일시": st.column_config.TextColumn("입력일시", width="small"),
+                    "부서명": st.column_config.TextColumn("부서명", width="small"),
+                    "구분": st.column_config.TextColumn("구분", width="small"),
+                    # ★ 업무내용 칸을 넓게(large) 설정하여 내용이 더 잘 보이게 함
+                    "업무내용": st.column_config.TextColumn("업무내용", width="large"),
+                    "진행상태": st.column_config.TextColumn("진행상태", width="small"),
+                    "마감기한": st.column_config.TextColumn("마감기한", width="small"),
+                    "담당자": st.column_config.TextColumn("담당자", width="small"),
+                    "비고": st.column_config.TextColumn("비고", width="small"),
+                }
+            )
+            # --- [수정된 부분] 표 디자인 개선 끝 ---
+            
         else:
             st.info("👋 아직 등록된 안건이 없습니다. 이번 주 안건을 등록해주세요.")
 
@@ -176,7 +181,22 @@ elif menu == "🗄️ 지난 기록 (History)":
         if not df.empty:
             meeting_dates = list(df['회차정보'].unique())
             selected_date = st.selectbox("보고 싶은 회차를 선택하세요:", meeting_dates)
-            st.dataframe(df[df['회차정보'] == selected_date], use_container_width=True, hide_index=True)
+            
+            # --- [수정] 지난 기록도 동일하게 보기 좋게 설정 ---
+            history_df = df[df['회차정보'] == selected_date]
+            st.dataframe(
+                history_df, 
+                use_container_width=True, 
+                hide_index=True,
+                column_config={
+                    "회차정보": st.column_config.TextColumn("회차정보", width="medium"),
+                    "입력일시": st.column_config.TextColumn("입력일시", width="small"),
+                    "부서명": st.column_config.TextColumn("부서명", width="small"),
+                    "업무내용": st.column_config.TextColumn("업무내용", width="large"), # 여기도 넓게
+                    "비고": st.column_config.TextColumn("비고", width="small"),
+                }
+            )
+            # ------------------------------------------------
         else:
             st.warning("보관된 기록이 없습니다.")
     except Exception as e:
@@ -188,15 +208,12 @@ elif menu == "⚙️ 관리자 (Admin)":
     
     password = st.text_input("관리자 비밀번호를 입력하세요.", type="password")
 
-    # [수정된 부분] 안전하게 비밀번호 가져오기
     try:
-        # 클라우드에 'admin' 설정이 있으면 가져오기
         if "admin" in st.secrets:
             real_password = st.secrets["admin"]["password"]
         else:
             real_password = "1234"
     except Exception:
-        # 내 컴퓨터(로컬)라서 에러나면 그냥 "1234"로 설정
         real_password = "1234"
     
     if password == real_password:
