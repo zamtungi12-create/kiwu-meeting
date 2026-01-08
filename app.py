@@ -8,9 +8,47 @@ st.set_page_config(page_title="KIWU Smart Meeting", page_icon="🎓", layout="wi
 
 st.markdown("""
     <style>
-    .main-header { font-size: 2.0rem; color: #003478; font-weight: bold; margin-bottom: 10px; }
-    .card-box { background-color: white; padding: 20px; border-radius: 12px; border: 1px solid #e0e0e0; box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: center; }
-    .admin-box { background-color: #fff5f5; padding: 20px; border-radius: 10px; border: 1px solid #ffcccc; }
+    /* 전체 배경색을 아주 연한 회색으로 주어 깔끔함 강조 */
+    .stApp { background-color: #f8f9fa; }
+    
+    /* 헤더 디자인 */
+    .main-header { 
+        font-size: 2.2rem; 
+        color: #003478; /* 경인여대 UI 컬러 */
+        font-weight: 800; 
+        margin-top: 10px;
+        margin-bottom: 5px; 
+    }
+    .sub-header {
+        font-size: 1.0rem;
+        color: #666;
+        margin-bottom: 25px;
+    }
+    
+    /* 카드 박스 디자인 (그림자 + 상단 컬러바 + 마우스 효과) */
+    .card-box { 
+        background-color: white; 
+        padding: 25px; 
+        border-radius: 15px; 
+        border: 1px solid #edf2f7; /* 아주 연한 테두리 */
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* 부드러운 그림자 */
+        text-align: center; 
+        border-top: 5px solid #003478; /* 상단 포인트 컬러 */
+        transition: all 0.3s ease; /* 부드러운 움직임 */
+    }
+    /* 마우스를 올렸을 때 살짝 떠오르는 효과 */
+    .card-box:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    }
+    
+    /* 관리자 박스 */
+    .admin-box { 
+        background-color: #fff5f5; 
+        padding: 20px; 
+        border-radius: 10px; 
+        border: 1px solid #ffcccc; 
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -44,7 +82,33 @@ with st.sidebar:
 
 # --- [4] 기능 1: 금주 현황 (Current) ---
 if menu == "📊 금주 현황 (Current)":
-    st.markdown('<div class="main-header">📅 이번 주 회의 안건</div>', unsafe_allow_html=True)
+    
+    # ---------------------------------------------------------
+    # [스마트 배너 기능] 시간에 따라 다른 사진 보여주기
+    # ---------------------------------------------------------
+    current_hour = datetime.now().hour # 현재 시간(시) 가져오기 (0~23)
+
+    # 아침 6시부터 저녁 6시(18시) 전까지는 '주간 사진'
+    if 6 <= current_hour < 18:
+        banner_image = "campus_day.png"
+        caption_text = "경인여자대학교의 힘찬 하루"
+    # 그 외 시간(밤)에는 '야간 사진'
+    else:
+        banner_image = "campus_night.png"
+        caption_text = "경인여자대학교의 빛나는 열정"
+
+    # 사진 띄우기 (에러 방지 처리)
+    try:
+        # use_container_width=True: 화면 가로폭에 꽉 차게
+        st.image(banner_image, use_container_width=True, caption=caption_text)
+    except:
+        # 만약 사진 파일이 없어도 에러 없이 넘어감
+        pass
+    # ---------------------------------------------------------
+
+    st.markdown('<div class="main-header">🎓 대학혁신 주간 업무보고</div>', unsafe_allow_html=True)
+    # ... (이 아래는 기존 코드와 동일) ...
+    st.markdown(f'<div class="sub-header">📅 기준일: {datetime.now().strftime("%Y년 %m월 %d일")} | 종이 없는 스마트 회의 시스템</div>', unsafe_allow_html=True)
     
     try:
         sheet = get_google_sheet("Current")
