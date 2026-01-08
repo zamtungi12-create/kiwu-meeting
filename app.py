@@ -3,18 +3,27 @@ import pandas as pd
 import gspread
 from datetime import datetime
 
+# --- [0] 부서 순서 정의 (고정 리스트) ---
+# 이곳의 순서를 바꾸면 입력 폼과 조회 화면의 정렬 순서가 동시에 바뀝니다.
+DEPT_ORDER = [
+    "교목실", "감사팀", "기획팀", "미래전략센터", "혁신지원사업단", 
+    "교무수업팀", "교무인사팀", "교육혁신센터", "학사학위센터", 
+    "학생복지팀", "장애학생지원센터", "학생상담센터", "사회공헌센터", 
+    "커뮤니케이션팀", "입학지원팀", "취창업진로지원센터", "산학운영팀", 
+    "RISE사업단", "현장실습지원센터", "일학습병행공동훈련센터", 
+    "총무팀", "시설안전팀", "국제교육팀", "글로벌커리어센터", 
+    "글로벌인재정주지원센터", "평생교육원", "도서관", "전산정보원", "SG캠퍼스사업단"
+]
+
 # --- [1] 기본 설정 및 디자인 ---
 st.set_page_config(page_title="KIWU Smart Meeting", page_icon="🎓", layout="wide")
 
 st.markdown("""
     <style>
-    /* 전체 배경색을 아주 연한 회색으로 주어 깔끔함 강조 */
     .stApp { background-color: #f8f9fa; }
-    
-    /* 헤더 디자인 */
     .main-header { 
         font-size: 2.2rem; 
-        color: #003478; /* 경인여대 UI 컬러 */
+        color: #003478; 
         font-weight: 800; 
         margin-top: 10px;
         margin-bottom: 5px; 
@@ -24,25 +33,20 @@ st.markdown("""
         color: #666;
         margin-bottom: 25px;
     }
-    
-    /* 카드 박스 디자인 (그림자 + 상단 컬러바 + 마우스 효과) */
     .card-box { 
         background-color: white; 
         padding: 25px; 
         border-radius: 15px; 
-        border: 1px solid #edf2f7; /* 아주 연한 테두리 */
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* 부드러운 그림자 */
+        border: 1px solid #edf2f7; 
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); 
         text-align: center; 
-        border-top: 5px solid #003478; /* 상단 포인트 컬러 */
-        transition: all 0.3s ease; /* 부드러운 움직임 */
+        border-top: 5px solid #003478; 
+        transition: all 0.3s ease; 
     }
-    /* 마우스를 올렸을 때 살짝 떠오르는 효과 */
     .card-box:hover {
         transform: translateY(-5px);
         box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
     }
-    
-    /* 관리자 박스 */
     .admin-box { 
         background-color: #fff5f5; 
         padding: 20px; 
@@ -80,7 +84,6 @@ with st.sidebar:
 # --- [4] 기능 1: 금주 현황 (Current) ---
 if menu == "📊 금주 현황 (Current)":
     
-    # [스마트 배너]
     current_hour = datetime.now().hour 
     if 6 <= current_hour < 18:
         banner_image = "campus_day.png"
@@ -112,11 +115,24 @@ if menu == "📊 금주 현황 (Current)":
             
             st.markdown("---")
             
-            dept_list = list(df['부서명'].unique())
-            selected_dept = st.multiselect("부서 필터:", dept_list, default=dept_list)
+            # [수정] 부서 필터 순서를 DEPT_ORDER 기준으로 정렬
+            # 데이터에 있는 부서만 추려내되, 순서는 DEPT_ORDER를 따름
+            unique_depts = df['부서명'].unique()
+            sorted_depts = [d for d in DEPT_ORDER if d in unique_depts]
+            
+            # 혹시 리스트에 없는 부서(예: 오타, 옛날 부서명)가 있다면 맨 뒤에 추가
+            others = [d for d in unique_depts if d not in DEPT_ORDER]
+            final_dept_list = sorted_depts + others
+
+            selected_dept = st.multiselect("부서 필터:", final_dept_list, default=final_dept_list)
+            
+            # 데이터 필터링
             filtered_df = df[df['부서명'].isin(selected_dept)]
             
-            # --- [수정된 부분] 표 디자인 개선 시작 ---
+            # [수정] 표 데이터 자체도 부서 순서대로 정렬 (Categorical Sort)
+            filtered_df['부서명'] = pd.Categorical(filtered_df['부서명'], categories=DEPT_ORDER + others, ordered=True)
+            filtered_df = filtered_df.sort_values('부서명')
+
             st.dataframe(
                 filtered_df, 
                 use_container_width=True, 
@@ -125,7 +141,6 @@ if menu == "📊 금주 현황 (Current)":
                     "입력일시": st.column_config.TextColumn("입력일시", width="small"),
                     "부서명": st.column_config.TextColumn("부서명", width="small"),
                     "구분": st.column_config.TextColumn("구분", width="small"),
-                    # ★ 업무내용 칸을 넓게(large) 설정하여 내용이 더 잘 보이게 함
                     "업무내용": st.column_config.TextColumn("업무내용", width="large"),
                     "진행상태": st.column_config.TextColumn("진행상태", width="small"),
                     "마감기한": st.column_config.TextColumn("마감기한", width="small"),
@@ -133,7 +148,6 @@ if menu == "📊 금주 현황 (Current)":
                     "비고": st.column_config.TextColumn("비고", width="small"),
                 }
             )
-            # --- [수정된 부분] 표 디자인 개선 끝 ---
             
         else:
             st.info("👋 아직 등록된 안건이 없습니다. 이번 주 안건을 등록해주세요.")
@@ -149,7 +163,8 @@ elif menu == "📝 안건 등록 (Input)":
     with st.form("input_form", clear_on_submit=True):
         col_a, col_b = st.columns(2)
         with col_a:
-            input_dept = st.selectbox("부서", ["기획처", "교무처", "입학처", "사무처", "산학협력단", "평생교육원", "도서관"])
+            # [수정] 위에서 정의한 DEPT_ORDER 변수를 사용하여 순서 고정
+            input_dept = st.selectbox("부서", DEPT_ORDER)
             input_type = st.selectbox("구분", ["주요현안", "일반보고", "협조요청"])
         with col_b:
             input_status = st.selectbox("상태", ["진행중", "완료", "지연", "예정"])
@@ -182,8 +197,15 @@ elif menu == "🗄️ 지난 기록 (History)":
             meeting_dates = list(df['회차정보'].unique())
             selected_date = st.selectbox("보고 싶은 회차를 선택하세요:", meeting_dates)
             
-            # --- [수정] 지난 기록도 동일하게 보기 좋게 설정 ---
             history_df = df[df['회차정보'] == selected_date]
+            
+            # [수정] 지난 기록에서도 부서 순서대로 정렬해서 보여주기
+            unique_depts_hist = df['부서명'].unique()
+            others_hist = [d for d in unique_depts_hist if d not in DEPT_ORDER]
+            
+            history_df['부서명'] = pd.Categorical(history_df['부서명'], categories=DEPT_ORDER + others_hist, ordered=True)
+            history_df = history_df.sort_values('부서명')
+
             st.dataframe(
                 history_df, 
                 use_container_width=True, 
@@ -192,11 +214,10 @@ elif menu == "🗄️ 지난 기록 (History)":
                     "회차정보": st.column_config.TextColumn("회차정보", width="medium"),
                     "입력일시": st.column_config.TextColumn("입력일시", width="small"),
                     "부서명": st.column_config.TextColumn("부서명", width="small"),
-                    "업무내용": st.column_config.TextColumn("업무내용", width="large"), # 여기도 넓게
+                    "업무내용": st.column_config.TextColumn("업무내용", width="large"),
                     "비고": st.column_config.TextColumn("비고", width="small"),
                 }
             )
-            # ------------------------------------------------
         else:
             st.warning("보관된 기록이 없습니다.")
     except Exception as e:
