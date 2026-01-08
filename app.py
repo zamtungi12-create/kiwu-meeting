@@ -126,8 +126,15 @@ elif menu == "⚙️ 관리자 (Admin)":
     
     # 간단한 비밀번호 보호 (원하시면 변경 가능)
     password = st.text_input("관리자 비밀번호를 입력하세요.", type="password")
-    
-    if password == "1234": # 비밀번호 1234
+
+# 1. 클라우드에 등록된 비밀번호 가져오기 (없으면 기본값 1234)
+if "admin" in st.secrets:
+    real_password = st.secrets["admin"]["password"]
+else:
+    real_password = "kiwu1992!" # 내 컴퓨터에서 테스트할 때용
+
+# 2. 비밀번호 비교
+if password == real_password:
         st.success("관리자 모드 접속 완료")
         
         st.markdown("""
