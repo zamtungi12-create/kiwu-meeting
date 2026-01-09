@@ -51,27 +51,20 @@ st.markdown("""
         background-color: #ebf8ff; padding: 20px; border-radius: 10px; border: 1px solid #bee3f8; 
     }
 
-    /* [중요] 모든 st.dataframe의 헤더 스타일 강제 적용 */
-    div[data-testid="stColumnHeader"] {
-        background-color: #f0f2f6; /* 헤더 배경색 */
-        justify-content: center !important; /* 가운데 정렬 */
-        text-align: center !important;
-    }
-    
-    div[data-testid="stColumnHeader"] > div {
-        font-size: 18px !important;    /* 글자 크기 키움 (18px) */
-        font-weight: 900 !important;    /* 폰트 두께 (아주 굵게) */
-        color: #003478 !important;      /* 글자 색상 (학교 메인 컬러) */
-        justify-content: center !important;
+    /* [핵심 수정] 모든 st.dataframe의 헤더(제목줄) 스타일링 */
+    /* 표의 헤더 영역(role="columnheader")을 정확히 타겟팅 */
+    div[data-testid="stDataFrame"] div[role="columnheader"] {
+        background-color: #f0f2f6 !important; /* 배경색 */
+        color: #003478 !important;            /* 글자색 (학교색) */
+        font-size: 16px !important;           /* 글자 크기 확대 */
+        font-weight: 800 !important;          /* 글자 굵게 */
     }
 
-    /* [옵션] 데이터 셀 내용도 가운데 정렬하고 싶다면 아래 주석 해제 */
-    /*
-    div[data-testid="stDataFrame"] div[role="gridcell"] {
+    /* 헤더 내부의 텍스트 컨테이너를 가운데 정렬 */
+    div[data-testid="stDataFrame"] div[role="columnheader"] > div {
         justify-content: center !important;
         text-align: center !important;
     }
-    */
 
     @media print {
         .stSidebar, header, footer, .no-print { display: none !important; }
@@ -141,6 +134,7 @@ def create_docx(df, title_text):
 @st.dialog("🔍 전체 안건 확대 보기", width="large")
 def show_fullscreen_table(df):
     st.markdown("### 📋 전체 안건 목록")
+    # 팝업 내 테이블도 CSS의 영향을 받아 스타일이 적용됨
     st.dataframe(
         df, 
         use_container_width=True, 
