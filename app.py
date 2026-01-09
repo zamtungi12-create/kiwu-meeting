@@ -4,7 +4,6 @@ import gspread
 from datetime import datetime
 
 # --- [0] 부서 순서 정의 (고정 리스트) ---
-# 이곳의 순서를 바꾸면 입력 폼과 조회 화면의 정렬 순서가 동시에 바뀝니다.
 DEPT_ORDER = [
     "교목실", "감사팀", "기획팀", "미래전략센터", "혁신지원사업단", 
     "교무수업팀", "교무인사팀", "교육혁신센터", "학사학위센터", 
@@ -84,7 +83,8 @@ with st.sidebar:
     st.image("https://upload.wikimedia.org/wikipedia/commons/2/25/Gyeongin_Women%27s_University_Emblem.png", width=80)
     st.title("KIWU Admin")
     
-    menu = st.radio("메뉴 선택", ["📊 금주 현황 (Current)", "📝 안건 등록 (Input)", "🗄️ 지난 기록 (History)", "⚙️ 관리자 (Admin)"])
+    # [수정] 메뉴에 '수정/삭제' 추가
+    menu = st.radio("메뉴 선택", ["📊 금주 현황 (Current)", "📝 안건 등록 (Input)", "🛠️ 수정/삭제 (Edit)", "🗄️ 지난 기록 (History)", "⚙️ 관리자 (Admin)"])
     
     st.markdown("---")
     if st.button("🔄 새로고침"):
@@ -124,26 +124,26 @@ if menu == "📊 금주 현황 (Current)":
             
             st.markdown("---")
             
-            # [수정] 부서 필터 순서를 DEPT_ORDER 기준으로 정렬
-            # 데이터에 있는 부서만 추려내되, 순서는 DEPT_ORDER를 따름
             unique_depts = df['부서명'].unique()
             sorted_depts = [d for d in DEPT_ORDER if d in unique_depts]
-            
-            # 혹시 리스트에 없는 부서(예: 오타, 옛날 부서명)가 있다면 맨 뒤에 추가
             others = [d for d in unique_depts if d not in DEPT_ORDER]
             final_dept_list = sorted_depts + others
 
             selected_dept = st.multiselect("부서 필터:", final_dept_list, default=final_dept_list)
             
-            # 데이터 필터링
             filtered_df = df[df['부서명'].isin(selected_dept)]
             
-            # [수정] 표 데이터 자체도 부서 순서대로 정렬 (Categorical Sort)
             filtered_df['부서명'] = pd.Categorical(filtered_df['부서명'], categories=DEPT_ORDER + others, ordered=True)
             filtered_df = filtered_df.sort_values('부서명')
 
+            # [추가] 현황판에서는 '비밀번호' 컬럼이 보이면 안 되므로 제거 후 출력
+            if '비밀번호' in filtered_df.columns:
+                display_df = filtered_df.drop(columns=['비밀번호'])
+            else:
+                display_df = filtered_df
+
             st.dataframe(
-                filtered_df, 
+                display_df, 
                 use_container_width=True, 
                 hide_index=True,
                 column_config={
@@ -172,7 +172,6 @@ elif menu == "📝 안건 등록 (Input)":
     with st.form("input_form", clear_on_submit=True):
         col_a, col_b = st.columns(2)
         with col_a:
-            # [수정] 위에서 정의한 DEPT_ORDER 변수를 사용하여 순서 고정
             input_dept = st.selectbox("부서", DEPT_ORDER)
             input_type = st.selectbox("구분", ["주요현안", "일반보고", "협조요청"])
         with col_b:
@@ -184,14 +183,105 @@ elif menu == "📝 안건 등록 (Input)":
         with col_c: input_name = st.text_input("담당자")
         with col_d: input_note = st.text_input("비고")
         
+        # [추가] 비밀번호 입력란 (수정/삭제용)
+        st.markdown("---")
+        st.caption("🔒 수정/삭제를 위해 비밀번호(숫자 4자리)를 입력해주세요.")
+        input_pw = st.text_input("비밀번호", type="password", max_chars=4, placeholder="예: 1234")
+        
         if st.form_submit_button("💾 등록하기", type="primary"):
-            try:
-                sheet = get_google_sheet("Current")
-                now = datetime.now().strftime("%Y-%m-%d %H:%M")
-                sheet.append_row([now, input_dept, input_type, input_content, input_status, str(input_date), input_name, input_note])
-                st.success("등록되었습니다!")
-            except Exception as e:
-                st.error(f"저장 실패: {e}")
+            # 비밀번호 미입력 시 경고
+            if not input_pw:
+                st.warning("비밀번호를 입력해주세요!")
+            else:
+                try:
+                    sheet = get_google_sheet("Current")
+                    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+                    # [추가] 비밀번호를 맨 마지막 컬럼에 함께 저장
+                    sheet.append_row([now, input_dept, input_type, input_content, input_status, str(input_date), input_name, input_note, input_pw])
+                    st.success("등록되었습니다!")
+                except Exception as e:
+                    st.error(f"저장 실패: {e}")
+
+# --- [NEW] 기능 3: 수정/삭제 (Edit) ---
+elif menu == "🛠️ 수정/삭제 (Edit)":
+    st.markdown('<div class="main-header">🛠️ 안건 수정 및 삭제</div>', unsafe_allow_html=True)
+    
+    try:
+        sheet = get_google_sheet("Current")
+        data = sheet.get_all_records()
+        df = pd.DataFrame(data)
+        
+        if df.empty:
+            st.info("수정할 데이터가 없습니다.")
+        else:
+            # 1. 수정할 안건 찾기
+            st.subheader("1. 수정할 안건 선택")
+            
+            # 검색 편의를 위해 부서 선택
+            dept_list_for_edit = sorted(df['부서명'].unique())
+            edit_dept = st.selectbox("부서를 선택하세요", dept_list_for_edit)
+            target_df = df[df['부서명'] == edit_dept]
+            
+            # 안건 선택 (시간 + 내용으로 구분)
+            if not target_df.empty:
+                task_options = target_df.apply(lambda x: f"[{x['입력일시']}] {x['업무내용'][:20]}...", axis=1)
+                selected_task_idx = st.selectbox("안건을 선택하세요", task_options.index, format_func=lambda x: task_options[x])
+                
+                selected_row = df.loc[selected_task_idx]
+                st.info(f"선택된 안건: {selected_row['업무내용']}")
+                
+                # 2. 비밀번호 확인
+                st.subheader("2. 비밀번호 확인")
+                chk_pw = st.text_input("등록할 때 입력한 비밀번호를 입력하세요", type="password")
+                
+                if st.button("확인"):
+                    # 비밀번호 비교 (문자열로 변환하여 비교)
+                    if str(selected_row.get('비밀번호', '')) == str(chk_pw):
+                        st.session_state['auth_success'] = True
+                        st.session_state['target_idx'] = selected_task_idx 
+                    else:
+                        st.error("비밀번호가 일치하지 않습니다.")
+                
+                # 3. 수정/삭제 폼 (인증 성공 시에만 표시)
+                if st.session_state.get('auth_success', False):
+                    st.divider()
+                    st.subheader("3. 내용 수정")
+                    
+                    with st.form("edit_form"):
+                        # 기존 값 불러오기
+                        e_type = st.selectbox("구분", ["주요현안", "일반보고", "협조요청"], index=["주요현안", "일반보고", "협조요청"].index(selected_row['구분']))
+                        e_status = st.selectbox("상태", ["진행중", "완료", "지연", "예정"], index=["진행중", "완료", "지연", "예정"].index(selected_row['진행상태']))
+                        e_content = st.text_area("업무 내용", value=selected_row['업무내용'])
+                        e_note = st.text_input("비고", value=selected_row['비고'])
+                        
+                        c1, c2 = st.columns(2)
+                        with c1:
+                            update_btn = st.form_submit_button("수정 저장", type="primary")
+                        with c2:
+                            delete_btn = st.form_submit_button("🗑️ 삭제하기")
+                        
+                        # 엑셀의 실제 행 번호 (헤더가 1행 + 0부터 시작하는 인덱스 + 1 = 인덱스 + 2)
+                        real_row_num = selected_task_idx + 2 
+                        
+                        if update_btn:
+                            # 업데이트 (3열:구분, 4열:내용, 5열:상태, 8열:비고)
+                            sheet.update_cell(real_row_num, 3, e_type)
+                            sheet.update_cell(real_row_num, 4, e_content)
+                            sheet.update_cell(real_row_num, 5, e_status)
+                            sheet.update_cell(real_row_num, 8, e_note)
+                            
+                            st.success("수정되었습니다! 새로고침 해주세요.")
+                            del st.session_state['auth_success'] # 초기화
+                            
+                        if delete_btn:
+                            sheet.delete_rows(real_row_num)
+                            st.success("삭제되었습니다! 새로고침 해주세요.")
+                            del st.session_state['auth_success'] # 초기화
+            else:
+                st.warning("해당 부서에 등록된 안건이 없습니다.")
+
+    except Exception as e:
+        st.error(f"오류: {e}")
 
 # --- [6] 기능 3: 지난 기록 (History) ---
 elif menu == "🗄️ 지난 기록 (History)":
@@ -208,7 +298,6 @@ elif menu == "🗄️ 지난 기록 (History)":
             
             history_df = df[df['회차정보'] == selected_date]
             
-            # [수정] 지난 기록에서도 부서 순서대로 정렬해서 보여주기
             unique_depts_hist = df['부서명'].unique()
             others_hist = [d for d in unique_depts_hist if d not in DEPT_ORDER]
             
@@ -259,11 +348,9 @@ elif menu == "⚙️ 관리자 (Admin)":
         
         meeting_name = st.text_input("이번 마감할 회차 이름을 입력하세요 (예: 2026-01-08 정기회의)")
         
-        # [2번 추가됨] 실수 방지용 체크박스
         confirm_close = st.checkbox("⚠️ 정말로 이번 주 데이터를 마감하고 초기화하시겠습니까?")
         
         if st.button("🚀 마감 실행 및 데이터 이관"):
-            # [2번 로직] 체크박스가 체크되지 않았으면 실행 안 함
             if not confirm_close:
                 st.error("위의 '마감 확인' 체크박스를 먼저 선택해주세요! (실수 방지)")
             elif not meeting_name:
