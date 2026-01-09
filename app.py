@@ -43,20 +43,6 @@ st.markdown("""
         transform: translateY(-5px);
         box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
     }
-    /* 미제출 알림 박스 스타일 */
-    .nudge-box {
-        background-color: #fff5f5; 
-        border: 2px solid #fc8181; 
-        padding: 20px; 
-        border-radius: 10px;
-        margin-bottom: 20px;
-        animation: pulse 2s infinite;
-    }
-    @keyframes pulse {
-        0% { box-shadow: 0 0 0 0 rgba(252, 129, 129, 0.4); }
-        70% { box-shadow: 0 0 0 10px rgba(252, 129, 129, 0); }
-        100% { box-shadow: 0 0 0 0 rgba(252, 129, 129, 0); }
-    }
     .admin-box { 
         background-color: #ebf8ff; padding: 20px; border-radius: 10px; border: 1px solid #bee3f8; 
     }
@@ -149,31 +135,28 @@ if menu == "📊 금주 현황 (Current)":
         data = sheet.get_all_records()
         df = pd.DataFrame(data)
 
-        # [NEW] 미제출 부서 계산 로직
+        # 미제출 부서 계산
         submitted_depts = []
         if not df.empty:
             submitted_depts = df['부서명'].unique()
-        
-        # 전체 부서 중 제출하지 않은 부서 필터링 (순서 유지)
         unsubmitted_list = [d for d in DEPT_ORDER if d not in submitted_depts]
 
-        # 1. 상단 알림 영역 (Nudge)
+        # 1. [수정됨] 상단 알림 영역 (Expander 적용)
         if unsubmitted_list:
-            st.markdown(f"""
-            <div class="nudge-box">
-                <h4 style="color: #c53030; margin: 0 0 10px 0;">📢 아직 안건을 제출하지 않은 부서가 있습니다! ({len(unsubmitted_list)}개)</h4>
-                <p style="color: #2d3748; font-size: 1.0rem; font-weight: 600; line-height: 1.6;">
-                    {', '.join(unsubmitted_list)}
-                </p>
-                <p style="color: #718096; font-size: 0.85rem; margin-top: 10px;">
-                    ※ 원활한 회의 진행을 위해 빠른 입력을 부탁드립니다. (본인 부서가 보인다면 '📝 안건 등록' 메뉴로 이동하세요!)
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
+            # 펼치기/접기 기능으로 심플하게 변경
+            with st.expander(f"🚨 미제출 부서 현황: 총 {len(unsubmitted_list)}개 부서 (클릭하여 명단 확인)", expanded=False):
+                st.markdown(f"""
+                <div style='background-color: #fff5f5; padding: 15px; border-radius: 5px; border-left: 5px solid #fc8181;'>
+                    <p style='color: #c53030; font-weight: bold; margin: 0;'>{', '.join(unsubmitted_list)}</p>
+                    <p style='font-size: 0.85rem; color: #718096; margin-top: 8px; margin-bottom: 0;'>
+                        ※ 원활한 회의 진행을 위해 빠른 입력을 부탁드립니다.
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
         else:
             if not df.empty:
                 st.balloons()
-                st.success("🎉 대단합니다! 모든 부서가 안건 제출을 완료했습니다. 👏")
+                st.success("🎉 모든 부서가 안건 제출을 완료했습니다!")
 
         # 2. 통계 카드 영역
         if not df.empty:
@@ -186,14 +169,17 @@ if menu == "📊 금주 현황 (Current)":
             
             st.markdown("---")
             
-            # 3. 데이터 테이블 영역
+            # 3. [수정됨] 부서 필터 영역 (Expander 적용)
             unique_depts = df['부서명'].unique()
             sorted_depts = [d for d in DEPT_ORDER if d in unique_depts]
             others = [d for d in unique_depts if d not in DEPT_ORDER]
             final_dept_list = sorted_depts + others
             
-            selected_dept = st.multiselect("부서 필터:", final_dept_list, default=final_dept_list)
+            # 필터를 접어서 공간 절약
+            with st.expander("🔍 부서별 필터링 옵션 (클릭하여 펼치기)", expanded=False):
+                selected_dept = st.multiselect("보고 싶은 부서를 선택하세요:", final_dept_list, default=final_dept_list)
             
+            # 4. 데이터 테이블 출력
             if selected_dept:
                 filtered_df = df[df['부서명'].isin(selected_dept)]
                 filtered_df['부서명'] = pd.Categorical(filtered_df['부서명'], categories=DEPT_ORDER + others, ordered=True)
@@ -217,7 +203,7 @@ if menu == "📊 금주 현황 (Current)":
                     }
                 )
             else:
-                st.info("부서를 선택해주세요.")
+                st.info("선택된 부서가 없습니다. 필터를 확인해주세요.")
         else:
             st.info("👋 아직 등록된 안건이 없습니다. 이번 주 안건을 등록해주세요.")
 
@@ -471,8 +457,8 @@ elif menu == "⚙️ 관리자 (Admin)":
                         records = data[1:]
                         history_records = []
                         for row in records:
-                            safe_row = row[:-1] # 비밀번호 제외
-                            safe_row.insert(0, meeting_name) # 회차명 추가
+                            safe_row = row[:-1]
+                            safe_row.insert(0, meeting_name)
                             history_records.append(safe_row)
                         
                         his_sheet.append_rows(history_records)
