@@ -20,12 +20,15 @@ DEPT_ORDER = [
     "글로벌인재정주지원센터", "평생교육원", "도서관", "전산정보원", "SG캠퍼스사업단"
 ]
 
-# --- [1] 기본 설정 및 디자인 ---
+# --- [1] 기본 설정 및 디자인 (이 부분을 교체하세요) ---
 st.set_page_config(page_title="KIWU Smart Meeting", page_icon="🎓", layout="wide")
 
 st.markdown("""
     <style>
+    /* 기본 배경 */
     .stApp { background-color: #f8f9fa; }
+    
+    /* 헤더 폰트 */
     .main-header { 
         font-size: 2.2rem; color: #003478; font-weight: 800; 
         margin-top: 10px; margin-bottom: 5px; 
@@ -33,6 +36,8 @@ st.markdown("""
     .sub-header {
         font-size: 1.0rem; color: #666; margin-bottom: 25px;
     }
+
+    /* 카드 박스 스타일 */
     .card-box { 
         background-color: white; padding: 20px 10px; border-radius: 10px; 
         border: 1px solid #edf2f7; 
@@ -51,19 +56,20 @@ st.markdown("""
         background-color: #ebf8ff; padding: 20px; border-radius: 10px; border: 1px solid #bee3f8; 
     }
 
-    /* [핵심 수정] 모든 st.dataframe의 헤더(제목줄) 스타일링 */
-    /* 표의 헤더 영역(role="columnheader")을 정확히 타겟팅 */
+    /* [초강력 CSS] 데이터프레임 헤더 강제 스타일링 
+       모든 하위 요소를 찾아서 강제로 덮어씌웁니다.
+    */
     div[data-testid="stDataFrame"] div[role="columnheader"] {
-        background-color: #f0f2f6 !important; /* 배경색 */
-        color: #003478 !important;            /* 글자색 (학교색) */
-        font-size: 16px !important;           /* 글자 크기 확대 */
-        font-weight: 800 !important;          /* 글자 굵게 */
+        background-color: #f0f2f6 !important;
+        border-bottom: 2px solid #003478 !important; /* 하단 파란줄 포인트 */
     }
 
-    /* 헤더 내부의 텍스트 컨테이너를 가운데 정렬 */
-    div[data-testid="stDataFrame"] div[role="columnheader"] > div {
-        justify-content: center !important;
-        text-align: center !important;
+    div[data-testid="stDataFrame"] div[role="columnheader"] * {
+        color: #003478 !important;            /* 글자색: 학교 파란색 */
+        font-size: 14px !important;           /* 글자크기: 14px */
+        font-weight: 900 !important;          /* 굵기: 아주 굵게 */
+        justify-content: center !important;   /* 가로 정렬: 가운데 */
+        text-align: center !important;        /* 텍스트 정렬: 가운데 */
     }
 
     @media print {
