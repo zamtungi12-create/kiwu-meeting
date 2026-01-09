@@ -97,7 +97,7 @@ if menu == "📊 금주 현황 (Current)":
     except:
         pass
 
-    st.markdown('<div class="main-header">🎓 대학혁신 주간 업무보고</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header">🎓 경인여자대학교 전략회의</div>', unsafe_allow_html=True)
     st.markdown(f'<div class="sub-header">📅 기준일: {datetime.now().strftime("%Y년 %m월 %d일")} | 종이 없는 스마트 회의 시스템</div>', unsafe_allow_html=True)
     
     try:
