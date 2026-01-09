@@ -56,17 +56,26 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- [2] 구글 시트 연결 함수 ---
-def get_google_sheet(sheet_name):
+# --- [2] 구글 시트 연결 함수 (캐싱 적용으로 속도 향상 🚀) ---
+@st.cache_resource
+def get_connection():
+    """구글 시트와의 연결을 한 번만 맺고 캐싱(저장)합니다."""
     try:
+        # 1. 스트림릿 클라우드 배포 환경 (Secrets 사용)
         if "gcp_service_account" in st.secrets:
             creds_dict = st.secrets["gcp_service_account"]
             gc = gspread.service_account_from_dict(creds_dict)
+        # 2. 로컬 개발 환경 (파일 사용)
         else:
             gc = gspread.service_account(filename='service_account.json')
     except Exception:
+        # 예외 발생 시 로컬 파일 시도
         gc = gspread.service_account(filename='service_account.json')
-        
+    return gc
+
+def get_google_sheet(sheet_name):
+    """캐싱된 연결을 사용하여 시트를 엽니다."""
+    gc = get_connection() # 위에서 만든 '빠른 연결'을 가져옴
     doc = gc.open("경인여대 스마트회의 DB")
     return doc.worksheet(sheet_name)
 
@@ -250,8 +259,14 @@ elif menu == "⚙️ 관리자 (Admin)":
         
         meeting_name = st.text_input("이번 마감할 회차 이름을 입력하세요 (예: 2026-01-08 정기회의)")
         
+        # [2번 추가됨] 실수 방지용 체크박스
+        confirm_close = st.checkbox("⚠️ 정말로 이번 주 데이터를 마감하고 초기화하시겠습니까?")
+        
         if st.button("🚀 마감 실행 및 데이터 이관"):
-            if not meeting_name:
+            # [2번 로직] 체크박스가 체크되지 않았으면 실행 안 함
+            if not confirm_close:
+                st.error("위의 '마감 확인' 체크박스를 먼저 선택해주세요! (실수 방지)")
+            elif not meeting_name:
                 st.warning("회차 이름을 먼저 입력해주세요!")
             else:
                 try:
