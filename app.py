@@ -33,16 +33,19 @@ st.markdown("""
         font-size: 1.0rem; color: #666; margin-bottom: 25px;
     }
     .card-box { 
-        background-color: white; padding: 25px; border-radius: 15px; 
+        background-color: white; padding: 20px 10px; border-radius: 10px; 
         border: 1px solid #edf2f7; 
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); 
-        text-align: center; border-top: 5px solid #003478; 
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); 
+        text-align: center; border-top: 4px solid #003478; 
         transition: all 0.3s ease;
     }
     .card-box:hover {
         transform: translateY(-5px);
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
     }
+    .card-box h5 { margin: 0; font-size: 0.9rem; color: #718096; }
+    .card-box h2 { margin: 5px 0 0 0; font-size: 1.8rem; font-weight: 700; color: #2d3748; }
+    
     .admin-box { 
         background-color: #ebf8ff; padding: 20px; border-radius: 10px; border: 1px solid #bee3f8; 
     }
@@ -141,9 +144,8 @@ if menu == "📊 금주 현황 (Current)":
             submitted_depts = df['부서명'].unique()
         unsubmitted_list = [d for d in DEPT_ORDER if d not in submitted_depts]
 
-        # 1. [수정됨] 상단 알림 영역 (Expander 적용)
+        # 1. 상단 알림 영역 (Expander)
         if unsubmitted_list:
-            # 펼치기/접기 기능으로 심플하게 변경
             with st.expander(f"🚨 미제출 부서 현황: 총 {len(unsubmitted_list)}개 부서 (클릭하여 명단 확인)", expanded=False):
                 st.markdown(f"""
                 <div style='background-color: #fff5f5; padding: 15px; border-radius: 5px; border-left: 5px solid #fc8181;'>
@@ -158,24 +160,32 @@ if menu == "📊 금주 현황 (Current)":
                 st.balloons()
                 st.success("🎉 모든 부서가 안건 제출을 완료했습니다!")
 
-        # 2. 통계 카드 영역
+        # 2. [NEW] 상태별 통계 대시보드 (5분할)
         if not df.empty:
-            col1, col2, col3 = st.columns(3)
-            with col1: st.markdown(f'<div class="card-box"><h5>전체 안건</h5><h2>{len(df)}건</h2></div>', unsafe_allow_html=True)
-            with col2: st.markdown(f'<div class="card-box"><h5>참여 부서</h5><h2>{len(submitted_depts)} / {len(DEPT_ORDER)}</h2></div>', unsafe_allow_html=True)
-            with col3: 
-                ongoing = len(df[df['진행상태'] == '진행중'])
-                st.markdown(f'<div class="card-box"><h5>진행 중</h5><h2 style="color:#e67e22;">{ongoing}건</h2></div>', unsafe_allow_html=True)
+            # 상태별 카운트 계산
+            cnt_total = len(df)
+            cnt_ing = len(df[df['진행상태'] == '진행중'])
+            cnt_plan = len(df[df['진행상태'] == '예정'])
+            cnt_done = len(df[df['진행상태'] == '완료'])
+            cnt_delay = len(df[df['진행상태'] == '지연'])
+
+            # 5개의 컬럼으로 분할
+            c1, c2, c3, c4, c5 = st.columns(5)
+
+            with c1: st.markdown(f'<div class="card-box"><h5>전체 안건</h5><h2>{cnt_total}</h2></div>', unsafe_allow_html=True)
+            with c2: st.markdown(f'<div class="card-box" style="border-top-color: #e67e22;"><h5>진행중</h5><h2 style="color:#e67e22;">{cnt_ing}</h2></div>', unsafe_allow_html=True)
+            with c3: st.markdown(f'<div class="card-box" style="border-top-color: #3182ce;"><h5>예정</h5><h2 style="color:#3182ce;">{cnt_plan}</h2></div>', unsafe_allow_html=True)
+            with c4: st.markdown(f'<div class="card-box" style="border-top-color: #38a169;"><h5>완료</h5><h2 style="color:#38a169;">{cnt_done}</h2></div>', unsafe_allow_html=True)
+            with c5: st.markdown(f'<div class="card-box" style="border-top-color: #e53e3e;"><h5>지연</h5><h2 style="color:#e53e3e;">{cnt_delay}</h2></div>', unsafe_allow_html=True)
             
             st.markdown("---")
             
-            # 3. [수정됨] 부서 필터 영역 (Expander 적용)
+            # 3. 부서 필터 영역 (Expander)
             unique_depts = df['부서명'].unique()
             sorted_depts = [d for d in DEPT_ORDER if d in unique_depts]
             others = [d for d in unique_depts if d not in DEPT_ORDER]
             final_dept_list = sorted_depts + others
             
-            # 필터를 접어서 공간 절약
             with st.expander("🔍 부서별 필터링 옵션 (클릭하여 펼치기)", expanded=False):
                 selected_dept = st.multiselect("보고 싶은 부서를 선택하세요:", final_dept_list, default=final_dept_list)
             
