@@ -72,8 +72,8 @@ st.markdown("""
     table.kiwu-table th {
         background-color: #f0f2f6;
         color: #003478;
-        font-size: 18px;       /* 글자 크기 키움 */
-        font-weight: 900;      /* 아주 굵게 */
+        font-size: 15px;       /* 글자 크기 키움 */
+        font-weight: 600;      /* 아주 굵게 */
         text-align: center;    /* 가운데 정렬 */
         padding: 15px 10px;
         border-bottom: 3px solid #003478; /* 하단 파란줄 */
