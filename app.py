@@ -4,11 +4,9 @@ import gspread
 from datetime import datetime
 from io import BytesIO
 
-# [필수] 워드 파일 생성을 위한 라이브러리 (requirements.txt에 python-docx 추가 필요)
+# [필수] 워드 파일 생성을 위한 라이브러리
 from docx import Document
-from docx.shared import Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.oxml.ns import qn
 
 # --- [0] 부서 순서 정의 (고정 리스트) ---
 DEPT_ORDER = [
@@ -45,10 +43,23 @@ st.markdown("""
         transform: translateY(-5px);
         box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
     }
-    .admin-box { 
-        background-color: #fff5f5; padding: 20px; border-radius: 10px; border: 1px solid #ffcccc; 
+    /* 미제출 알림 박스 스타일 */
+    .nudge-box {
+        background-color: #fff5f5; 
+        border: 2px solid #fc8181; 
+        padding: 20px; 
+        border-radius: 10px;
+        margin-bottom: 20px;
+        animation: pulse 2s infinite;
     }
-    /* 인쇄 시 적용될 스타일 */
+    @keyframes pulse {
+        0% { box-shadow: 0 0 0 0 rgba(252, 129, 129, 0.4); }
+        70% { box-shadow: 0 0 0 10px rgba(252, 129, 129, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(252, 129, 129, 0); }
+    }
+    .admin-box { 
+        background-color: #ebf8ff; padding: 20px; border-radius: 10px; border: 1px solid #bee3f8; 
+    }
     @media print {
         .stSidebar, header, footer, .no-print { display: none !important; }
         .print-only { display: block !important; }
@@ -78,28 +89,19 @@ def get_google_sheet(sheet_name):
 # --- [NEW] 워드 파일 생성 함수 ---
 def create_docx(df, title_text):
     doc = Document()
-    
-    # 타이틀 스타일
     title = doc.add_heading(title_text, 0)
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    
     doc.add_paragraph(f"생성일시: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     doc.add_paragraph("-" * 50)
-
-    # 테이블 생성 (헤더 + 데이터)
     table = doc.add_table(rows=1, cols=6)
     table.style = 'Table Grid'
-    
     hdr_cells = table.rows[0].cells
     headers = ["부서", "구분", "내용", "상태", "기한", "담당자"]
     for i, h in enumerate(headers):
         hdr_cells[i].text = h
-        # 헤더 볼드 처리
         for paragraph in hdr_cells[i].paragraphs:
             for run in paragraph.runs:
                 run.font.bold = True
-
-    # 데이터 채우기
     for index, row in df.iterrows():
         row_cells = table.add_row().cells
         row_cells[0].text = str(row['부서명'])
@@ -108,8 +110,6 @@ def create_docx(df, title_text):
         row_cells[3].text = str(row['진행상태'])
         row_cells[4].text = str(row['마감기한'])
         row_cells[5].text = str(row['담당자'])
-
-    # 메모리에 저장
     bio = BytesIO()
     doc.save(bio)
     bio.seek(0)
@@ -131,7 +131,6 @@ with st.sidebar:
         "🖨️ 회의록 다운로드 (Export)", 
         "⚙️ 관리자 (Admin)"
     ])
-    
     st.markdown("---")
     if st.button("🔄 새로고침"):
         st.rerun()
@@ -139,10 +138,7 @@ with st.sidebar:
 # --- [4] 기능 1: 금주 현황 ---
 if menu == "📊 금주 현황 (Current)":
     current_hour = datetime.now().hour 
-    if 6 <= current_hour < 18:
-        caption_text = "경인여자대학교의 힘찬 하루 ☀️"
-    else:
-        caption_text = "경인여자대학교의 빛나는 열정 🌙"
+    caption_text = "경인여자대학교의 힘찬 하루 ☀️" if 6 <= current_hour < 18 else "경인여자대학교의 빛나는 열정 🌙"
     st.caption(caption_text)
 
     st.markdown('<div class="main-header">🎓 경인여자대학교 전략회의</div>', unsafe_allow_html=True)
@@ -153,19 +149,49 @@ if menu == "📊 금주 현황 (Current)":
         data = sheet.get_all_records()
         df = pd.DataFrame(data)
 
+        # [NEW] 미제출 부서 계산 로직
+        submitted_depts = []
+        if not df.empty:
+            submitted_depts = df['부서명'].unique()
+        
+        # 전체 부서 중 제출하지 않은 부서 필터링 (순서 유지)
+        unsubmitted_list = [d for d in DEPT_ORDER if d not in submitted_depts]
+
+        # 1. 상단 알림 영역 (Nudge)
+        if unsubmitted_list:
+            st.markdown(f"""
+            <div class="nudge-box">
+                <h4 style="color: #c53030; margin: 0 0 10px 0;">📢 아직 안건을 제출하지 않은 부서가 있습니다! ({len(unsubmitted_list)}개)</h4>
+                <p style="color: #2d3748; font-size: 1.0rem; font-weight: 600; line-height: 1.6;">
+                    {', '.join(unsubmitted_list)}
+                </p>
+                <p style="color: #718096; font-size: 0.85rem; margin-top: 10px;">
+                    ※ 원활한 회의 진행을 위해 빠른 입력을 부탁드립니다. (본인 부서가 보인다면 '📝 안건 등록' 메뉴로 이동하세요!)
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            if not df.empty:
+                st.balloons()
+                st.success("🎉 대단합니다! 모든 부서가 안건 제출을 완료했습니다. 👏")
+
+        # 2. 통계 카드 영역
         if not df.empty:
             col1, col2, col3 = st.columns(3)
             with col1: st.markdown(f'<div class="card-box"><h5>전체 안건</h5><h2>{len(df)}건</h2></div>', unsafe_allow_html=True)
-            with col2: st.markdown(f'<div class="card-box"><h5>참여 부서</h5><h2>{df["부서명"].nunique()}개</h2></div>', unsafe_allow_html=True)
+            with col2: st.markdown(f'<div class="card-box"><h5>참여 부서</h5><h2>{len(submitted_depts)} / {len(DEPT_ORDER)}</h2></div>', unsafe_allow_html=True)
             with col3: 
                 ongoing = len(df[df['진행상태'] == '진행중'])
                 st.markdown(f'<div class="card-box"><h5>진행 중</h5><h2 style="color:#e67e22;">{ongoing}건</h2></div>', unsafe_allow_html=True)
             
             st.markdown("---")
+            
+            # 3. 데이터 테이블 영역
             unique_depts = df['부서명'].unique()
             sorted_depts = [d for d in DEPT_ORDER if d in unique_depts]
             others = [d for d in unique_depts if d not in DEPT_ORDER]
             final_dept_list = sorted_depts + others
+            
             selected_dept = st.multiselect("부서 필터:", final_dept_list, default=final_dept_list)
             
             if selected_dept:
@@ -173,10 +199,7 @@ if menu == "📊 금주 현황 (Current)":
                 filtered_df['부서명'] = pd.Categorical(filtered_df['부서명'], categories=DEPT_ORDER + others, ordered=True)
                 filtered_df = filtered_df.sort_values('부서명')
                 
-                if '비밀번호' in filtered_df.columns:
-                    display_df = filtered_df.drop(columns=['비밀번호'])
-                else:
-                    display_df = filtered_df
+                display_df = filtered_df.drop(columns=['비밀번호']) if '비밀번호' in filtered_df.columns else filtered_df
 
                 st.dataframe(
                     display_df, 
@@ -196,7 +219,8 @@ if menu == "📊 금주 현황 (Current)":
             else:
                 st.info("부서를 선택해주세요.")
         else:
-            st.info("👋 아직 등록된 안건이 없습니다.")
+            st.info("👋 아직 등록된 안건이 없습니다. 이번 주 안건을 등록해주세요.")
+
     except Exception as e:
         st.error(f"오류: {e}")
 
@@ -322,7 +346,7 @@ elif menu == "🗄️ 지난 기록 (History)":
     except Exception as e:
         st.error(f"오류: {e}")
 
-# --- [NEW] 기능 5: 회의록 다운로드 및 인쇄 ---
+# --- [8] 기능 5: 회의록 다운로드 및 인쇄 ---
 elif menu == "🖨️ 회의록 다운로드 (Export)":
     st.markdown('<div class="main-header">🖨️ 회의록 생성 및 다운로드</div>', unsafe_allow_html=True)
     
@@ -349,19 +373,14 @@ elif menu == "🖨️ 회의록 다운로드 (Export)":
             else:
                 st.warning("저장된 지난 기록이 없습니다.")
         
-        # 데이터가 있을 경우 출력 옵션 표시
         if not target_df.empty:
-            # 부서 정렬 적용
             unique_depts = target_df['부서명'].unique()
             sorted_depts = [d for d in DEPT_ORDER if d in unique_depts]
             others = [d for d in unique_depts if d not in DEPT_ORDER]
             target_df['부서명'] = pd.Categorical(target_df['부서명'], categories=DEPT_ORDER + others, ordered=True)
             target_df = target_df.sort_values('부서명')
 
-            # 보여줄 컬럼만 선택 (비밀번호 제외)
             cols_to_show = ['부서명', '구분', '업무내용', '진행상태', '마감기한', '담당자']
-            
-            # History인지 Current인지에 따라 컬럼 필터링
             final_df = target_df[cols_to_show] if set(cols_to_show).issubset(target_df.columns) else target_df
 
             st.divider()
@@ -369,11 +388,8 @@ elif menu == "🖨️ 회의록 다운로드 (Export)":
             st.dataframe(final_df, use_container_width=True, hide_index=True)
 
             c1, c2 = st.columns(2)
-            
-            # 1. Word 다운로드 버튼
             with c1:
                 st.markdown("### 📥 Word 다운로드")
-                st.caption("편집이 가능한 워드 파일(.docx)로 다운로드합니다.")
                 docx_file = create_docx(final_df, report_title)
                 st.download_button(
                     label="워드 파일 다운로드 (.docx)",
@@ -381,12 +397,8 @@ elif menu == "🖨️ 회의록 다운로드 (Export)":
                     file_name=f"{report_title}.docx",
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 )
-
-            # 2. 인쇄 및 PDF 저장 (브라우저 기능 활용)
             with c2:
                 st.markdown("### 🖨️ 인쇄 / PDF 저장")
-                st.caption("아래 버튼을 눌러 깔끔한 표를 열고, 브라우저 인쇄(Ctrl+P) → 'PDF로 저장'을 선택하세요.")
-                
                 html_table = final_df.to_html(index=False, classes='report-table')
                 html_content = f"""
                 <html>
@@ -398,7 +410,6 @@ elif menu == "🖨️ 회의록 다운로드 (Export)":
                         table {{ width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }}
                         th, td {{ border: 1px solid #444; padding: 8px; text-align: left; }}
                         th {{ background-color: #f2f2f2; text-align: center; font-weight: bold; }}
-                        .report-table {{ width: 100%; }}
                     </style>
                 </head>
                 <body>
@@ -408,7 +419,6 @@ elif menu == "🖨️ 회의록 다운로드 (Export)":
                 </body>
                 </html>
                 """
-                
                 with st.expander("👁️ 인쇄용 뷰 열기 (클릭)"):
                     st.components.v1.html(html_content, height=600, scrolling=True)
                     st.info("💡 위 표 위에서 마우스 오른쪽 버튼 -> '프레임 인쇄' 또는 이 화면 전체를 'Ctrl+P'로 인쇄하세요.")
@@ -416,10 +426,9 @@ elif menu == "🖨️ 회의록 다운로드 (Export)":
     except Exception as e:
         st.error(f"데이터 처리 중 오류 발생: {e}")
 
-# --- [8] 기능 6: 관리자 ---
+# --- [9] 기능 6: 관리자 ---
 elif menu == "⚙️ 관리자 (Admin)":
     st.markdown('<div class="main-header">⚙️ 관리자 페이지</div>', unsafe_allow_html=True)
-    
     password = st.text_input("관리자 비밀번호를 입력하세요.", type="password")
 
     try:
@@ -461,7 +470,6 @@ elif menu == "⚙️ 관리자 (Admin)":
                     else:
                         records = data[1:]
                         history_records = []
-
                         for row in records:
                             safe_row = row[:-1] # 비밀번호 제외
                             safe_row.insert(0, meeting_name) # 회차명 추가
