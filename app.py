@@ -6,7 +6,7 @@ from io import BytesIO
 
 # [필수] 워드 파일 생성을 위한 라이브러리
 from docx import Document
-from docx.shared import Pt, RGBColor # 폰트 크기 설정을 위해 Pt 추가
+from docx.shared import Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 # --- [0] 부서 순서 정의 (고정 리스트) ---
@@ -51,22 +51,27 @@ st.markdown("""
         background-color: #ebf8ff; padding: 20px; border-radius: 10px; border: 1px solid #bee3f8; 
     }
 
-    /* [NEW] 데이터프레임 헤더 스타일링 (CSS Hack) */
-    /* Streamlit 표의 헤더(컬럼명)를 타겟팅하여 스타일 적용 */
-    [data-testid="stDataFrame"] th {
+    /* [중요] 모든 st.dataframe의 헤더 스타일 강제 적용 */
+    div[data-testid="stColumnHeader"] {
+        background-color: #f0f2f6; /* 헤더 배경색 */
+        justify-content: center !important; /* 가운데 정렬 */
         text-align: center !important;
-        font-size: 1.1rem !important; /* 폰트 크기 키움 */
-        font-weight: 900 !important;   /* 아주 굵게 (Boldic) */
-        color: #003478 !important;     /* 학교색상 포인트 */
-        background-color: #f1f5f9 !important;
     }
     
-    /* 혹시 모를 내부 div 구조 대응 */
-    [data-testid="stDataFrame"] div[role="columnheader"] {
-        justify-content: center !important; /* 가운데 정렬 */
-        font-size: 16px !important;
-        font-weight: bold !important;
+    div[data-testid="stColumnHeader"] > div {
+        font-size: 18px !important;    /* 글자 크기 키움 (18px) */
+        font-weight: 900 !important;    /* 폰트 두께 (아주 굵게) */
+        color: #003478 !important;      /* 글자 색상 (학교 메인 컬러) */
+        justify-content: center !important;
     }
+
+    /* [옵션] 데이터 셀 내용도 가운데 정렬하고 싶다면 아래 주석 해제 */
+    /*
+    div[data-testid="stDataFrame"] div[role="gridcell"] {
+        justify-content: center !important;
+        text-align: center !important;
+    }
+    */
 
     @media print {
         .stSidebar, header, footer, .no-print { display: none !important; }
@@ -94,36 +99,28 @@ def get_google_sheet(sheet_name):
     doc = gc.open("경인여대 스마트회의 DB")
     return doc.worksheet(sheet_name)
 
-# --- [NEW] 워드 파일 생성 함수 (스타일링 업그레이드) ---
+# --- [NEW] 워드 파일 생성 함수 (스타일링 유지) ---
 def create_docx(df, title_text):
     doc = Document()
-    
-    # 문서 제목
     title = doc.add_heading(title_text, 0)
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     doc.add_paragraph(f"생성일시: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     doc.add_paragraph("-" * 50)
     
-    # 표 생성
     table = doc.add_table(rows=1, cols=6)
     table.style = 'Table Grid'
     
-    # 헤더 설정
     hdr_cells = table.rows[0].cells
     headers = ["부서", "구분", "내용", "상태", "기한", "담당자"]
     
     for i, h in enumerate(headers):
         hdr_cells[i].text = h
-        # 헤더 셀 스타일링 (가운데 정렬, 굵게, 폰트 키우기)
         paragraph = hdr_cells[i].paragraphs[0]
         paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        
         for run in paragraph.runs:
             run.font.bold = True
-            run.font.size = Pt(12) # [수정] 폰트 크기 12pt로 확대
-            run.font.name = 'Malgun Gothic' # (선택사항) 한글 폰트 지정 시도
+            run.font.size = Pt(12) 
 
-    # 데이터 채우기
     for index, row in df.iterrows():
         row_cells = table.add_row().cells
         row_cells[0].text = str(row['부서명'])
@@ -132,8 +129,6 @@ def create_docx(df, title_text):
         row_cells[3].text = str(row['진행상태'])
         row_cells[4].text = str(row['마감기한'])
         row_cells[5].text = str(row['담당자'])
-        
-        # 데이터 셀도 가운데 정렬 (선택사항, 깔끔함을 위해 적용)
         for cell in row_cells:
             cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
 
@@ -142,8 +137,8 @@ def create_docx(df, title_text):
     bio.seek(0)
     return bio
 
-# --- [NEW] 전체화면 팝업 함수 (st.dialog) ---
-@st.dialog("🔍 전체 안건 확대 보기 (Focus View)", width="large")
+# --- [NEW] 전체화면 팝업 함수 ---
+@st.dialog("🔍 전체 안건 확대 보기", width="large")
 def show_fullscreen_table(df):
     st.markdown("### 📋 전체 안건 목록")
     st.dataframe(
@@ -192,13 +187,11 @@ if menu == "📊 금주 현황 (Current)":
         data = sheet.get_all_records()
         df = pd.DataFrame(data)
 
-        # 미제출 부서 계산
         submitted_depts = []
         if not df.empty:
             submitted_depts = df['부서명'].unique()
         unsubmitted_list = [d for d in DEPT_ORDER if d not in submitted_depts]
 
-        # 1. 상단 알림 영역 (Expander)
         if unsubmitted_list:
             with st.expander(f"🚨 미제출 부서 현황: 총 {len(unsubmitted_list)}개 부서 (클릭하여 명단 확인)", expanded=False):
                 st.markdown(f"""
@@ -214,7 +207,6 @@ if menu == "📊 금주 현황 (Current)":
                 st.balloons()
                 st.success("🎉 모든 부서가 안건 제출을 완료했습니다!")
 
-        # 2. 상태별 통계 대시보드
         if not df.empty:
             cnt_total = len(df)
             cnt_ing = len(df[df['진행상태'] == '진행중'])
@@ -231,7 +223,6 @@ if menu == "📊 금주 현황 (Current)":
             
             st.markdown("---")
             
-            # 3. 부서 필터 & 전체화면 버튼
             col_filter, col_btn = st.columns([0.85, 0.15]) 
             
             with col_filter:
@@ -242,7 +233,6 @@ if menu == "📊 금주 현황 (Current)":
                     final_dept_list = sorted_depts + others
                     selected_dept = st.multiselect("보고 싶은 부서를 선택하세요:", final_dept_list, default=final_dept_list)
             
-            # 4. 데이터 테이블 출력
             if selected_dept:
                 filtered_df = df[df['부서명'].isin(selected_dept)]
                 filtered_df['부서명'] = pd.Categorical(filtered_df['부서명'], categories=DEPT_ORDER + others, ordered=True)
@@ -454,7 +444,6 @@ elif menu == "🖨️ 회의록 다운로드 (Export)":
             with c2:
                 st.markdown("### 🖨️ 인쇄 / PDF 저장")
                 
-                # [수정] 인쇄용 HTML 스타일링 강화 (가운데, 볼드, 폰트 업)
                 html_table = final_df.to_html(index=False, classes='report-table')
                 html_content = f"""
                 <html>
@@ -465,17 +454,15 @@ elif menu == "🖨️ 회의록 다운로드 (Export)":
                         .date {{ text-align: right; color: #666; margin-bottom: 20px; }}
                         table {{ width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }}
                         th, td {{ border: 1px solid #444; padding: 8px; }}
-                        /* 인쇄 뷰 헤더 스타일 핵심 */
                         th {{ 
                             background-color: #f2f2f2; 
                             text-align: center !important; 
-                            font-weight: 900 !important; /* Boldic */
-                            font-size: 16px !important;   /* Larger */
+                            font-weight: 900 !important; 
+                            font-size: 16px !important; 
                             color: #000;
                             padding: 10px;
                         }}
                         td {{ text-align: center; }}
-                        /* 내용 컬럼만 좌측 정렬 */
                         td:nth-child(3) {{ text-align: left; }}
                     </style>
                 </head>
