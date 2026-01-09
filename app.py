@@ -20,34 +20,35 @@ DEPT_ORDER = [
     "글로벌인재정주지원센터", "평생교육원", "도서관", "전산정보원", "SG캠퍼스사업단"
 ]
 
-# --- [1] 기본 설정 및 디자인 (이 부분을 교체하세요) ---
+# --- [1] 기본 설정 및 디자인 ---
 st.set_page_config(page_title="KIWU Smart Meeting", page_icon="🎓", layout="wide")
 
 st.markdown("""
     <style>
-    /* 기본 배경 */
-    .stApp { background-color: #f8f9fa; }
+    /* 전체 폰트 적용 */
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
     
-    /* 헤더 폰트 */
+    html, body, [class*="css"] {
+        font-family: 'Noto Sans KR', sans-serif;
+    }
+    
+    .stApp { background-color: #f8f9fa; }
+
+    /* 헤더 스타일 */
     .main-header { 
-        font-size: 2.2rem; color: #003478; font-weight: 800; 
+        font-size: 2.2rem; color: #003478; font-weight: 900; 
         margin-top: 10px; margin-bottom: 5px; 
     }
     .sub-header {
         font-size: 1.0rem; color: #666; margin-bottom: 25px;
     }
 
-    /* 카드 박스 스타일 */
+    /* 카드 박스 */
     .card-box { 
         background-color: white; padding: 20px 10px; border-radius: 10px; 
         border: 1px solid #edf2f7; 
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); 
         text-align: center; border-top: 4px solid #003478; 
-        transition: all 0.3s ease;
-    }
-    .card-box:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
     }
     .card-box h5 { margin: 0; font-size: 0.9rem; color: #718096; }
     .card-box h2 { margin: 5px 0 0 0; font-size: 1.8rem; font-weight: 700; color: #2d3748; }
@@ -56,20 +57,40 @@ st.markdown("""
         background-color: #ebf8ff; padding: 20px; border-radius: 10px; border: 1px solid #bee3f8; 
     }
 
-    /* [초강력 CSS] 데이터프레임 헤더 강제 스타일링 
-       모든 하위 요소를 찾아서 강제로 덮어씌웁니다.
-    */
-    div[data-testid="stDataFrame"] div[role="columnheader"] {
-        background-color: #f0f2f6 !important;
-        border-bottom: 2px solid #003478 !important; /* 하단 파란줄 포인트 */
+    /* [중요] HTML 테이블 스타일 정의 */
+    .kiwu-table-container {
+        overflow-x: auto;
     }
-
-    div[data-testid="stDataFrame"] div[role="columnheader"] * {
-        color: #003478 !important;            /* 글자색: 학교 파란색 */
-        font-size: 14px !important;           /* 글자크기: 14px */
-        font-weight: 900 !important;          /* 굵기: 아주 굵게 */
-        justify-content: center !important;   /* 가로 정렬: 가운데 */
-        text-align: center !important;        /* 텍스트 정렬: 가운데 */
+    table.kiwu-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 10px 0;
+        background-color: white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    /* 헤더 스타일 (사용자 요청 사항: 가운데, 볼드, 크게) */
+    table.kiwu-table th {
+        background-color: #f0f2f6;
+        color: #003478;
+        font-size: 18px;       /* 글자 크기 키움 */
+        font-weight: 900;      /* 아주 굵게 */
+        text-align: center;    /* 가운데 정렬 */
+        padding: 15px 10px;
+        border-bottom: 3px solid #003478; /* 하단 파란줄 */
+        white-space: nowrap;
+    }
+    /* 데이터 셀 스타일 */
+    table.kiwu-table td {
+        padding: 12px 10px;
+        border-bottom: 1px solid #e2e8f0;
+        text-align: center;    /* 기본 가운데 정렬 */
+        font-size: 15px;
+        color: #333;
+    }
+    /* 업무내용 컬럼(3번째)만 좌측 정렬 */
+    table.kiwu-table td:nth-child(3) {
+        text-align: left;
+        min-width: 300px;
     }
 
     @media print {
@@ -98,7 +119,18 @@ def get_google_sheet(sheet_name):
     doc = gc.open("경인여대 스마트회의 DB")
     return doc.worksheet(sheet_name)
 
-# --- [NEW] 워드 파일 생성 함수 (스타일링 유지) ---
+# --- [3] 스타일링된 HTML 테이블 생성 함수 ---
+def render_styled_table(df):
+    """
+    Pandas DataFrame을 예쁜 HTML 테이블로 변환하여 렌더링합니다.
+    st.dataframe 대신 사용하여 스타일을 강제합니다.
+    """
+    # HTML 변환
+    html = df.to_html(index=False, classes='kiwu-table', escape=False)
+    # 컨테이너로 감싸서 출력
+    st.markdown(f'<div class="kiwu-table-container">{html}</div>', unsafe_allow_html=True)
+
+# --- [4] 워드 파일 생성 함수 ---
 def create_docx(df, title_text):
     doc = Document()
     title = doc.add_heading(title_text, 0)
@@ -136,24 +168,15 @@ def create_docx(df, title_text):
     bio.seek(0)
     return bio
 
-# --- [NEW] 전체화면 팝업 함수 ---
+# --- [5] 전체화면 팝업 함수 ---
 @st.dialog("🔍 전체 안건 확대 보기", width="large")
 def show_fullscreen_table(df):
     st.markdown("### 📋 전체 안건 목록")
-    # 팝업 내 테이블도 CSS의 영향을 받아 스타일이 적용됨
-    st.dataframe(
-        df, 
-        use_container_width=True, 
-        height=800, 
-        hide_index=True,
-        column_config={
-            "업무내용": st.column_config.TextColumn("업무내용", width="large"),
-        }
-    )
+    render_styled_table(df) # 여기도 HTML 테이블 사용
     if st.button("닫기"):
         st.rerun()
 
-# --- [3] 사이드바 메뉴 ---
+# --- [6] 사이드바 메뉴 ---
 with st.sidebar:
     try:
         st.image("https://upload.wikimedia.org/wikipedia/commons/2/25/Gyeongin_Women%27s_University_Emblem.png", width=80)
@@ -173,7 +196,7 @@ with st.sidebar:
     if st.button("🔄 새로고침"):
         st.rerun()
 
-# --- [4] 기능 1: 금주 현황 ---
+# --- [7] 기능: 금주 현황 ---
 if menu == "📊 금주 현황 (Current)":
     current_hour = datetime.now().hour 
     caption_text = "경인여자대학교의 힘찬 하루 ☀️" if 6 <= current_hour < 18 else "경인여자대학교의 빛나는 열정 🌙"
@@ -238,37 +261,25 @@ if menu == "📊 금주 현황 (Current)":
                 filtered_df['부서명'] = pd.Categorical(filtered_df['부서명'], categories=DEPT_ORDER + others, ordered=True)
                 filtered_df = filtered_df.sort_values('부서명')
                 
+                # 비밀번호 컬럼 제외
                 display_df = filtered_df.drop(columns=['비밀번호']) if '비밀번호' in filtered_df.columns else filtered_df
+
+                # [변경] st.dataframe 대신 커스텀 HTML 테이블 사용
+                render_styled_table(display_df)
 
                 with col_btn:
                     st.write("") 
-                    if st.button("🖥️ 크게 보기", type="secondary", help="표를 팝업으로 크게 띄웁니다."):
+                    if st.button("🖥️ 크게 보기", type="secondary"):
                         show_fullscreen_table(display_df)
-
-                st.dataframe(
-                    display_df, 
-                    use_container_width=True, 
-                    hide_index=True,
-                    column_config={
-                        "입력일시": st.column_config.TextColumn("입력일시", width="small"),
-                        "부서명": st.column_config.TextColumn("부서명", width="small"),
-                        "구분": st.column_config.TextColumn("구분", width="small"),
-                        "업무내용": st.column_config.TextColumn("업무내용", width="large"),
-                        "진행상태": st.column_config.TextColumn("진행상태", width="small"),
-                        "마감기한": st.column_config.TextColumn("마감기한", width="small"),
-                        "담당자": st.column_config.TextColumn("담당자", width="small"),
-                        "비고": st.column_config.TextColumn("비고", width="small"),
-                    }
-                )
             else:
                 st.info("선택된 부서가 없습니다. 필터를 확인해주세요.")
         else:
-            st.info("👋 아직 등록된 안건이 없습니다. 이번 주 안건을 등록해주세요.")
+            st.info("👋 아직 등록된 안건이 없습니다.")
 
     except Exception as e:
         st.error(f"오류: {e}")
 
-# --- [5] 기능 2: 안건 등록 ---
+# --- [8] 기능: 안건 등록 ---
 elif menu == "📝 안건 등록 (Input)":
     st.markdown('<div class="main-header">📝 안건 등록</div>', unsafe_allow_html=True)
     st.info("입력된 내용은 '이번 주 현황'에 즉시 반영됩니다.")
@@ -288,8 +299,7 @@ elif menu == "📝 안건 등록 (Input)":
         with col_d: input_note = st.text_input("비고")
         
         st.markdown("---")
-        st.caption("🔒 수정/삭제를 위해 비밀번호(숫자 4자리)를 입력해주세요.")
-        input_pw = st.text_input("비밀번호", type="password", max_chars=4, placeholder="예: 1234")
+        input_pw = st.text_input("비밀번호(수정/삭제용 숫자 4자리)", type="password", max_chars=4)
         
         if st.form_submit_button("💾 등록하기", type="primary"):
             if not input_pw:
@@ -303,7 +313,7 @@ elif menu == "📝 안건 등록 (Input)":
                 except Exception as e:
                     st.error(f"저장 실패: {e}")
 
-# --- [6] 기능 3: 수정/삭제 ---
+# --- [9] 기능: 수정/삭제 (여기는 데이터프레임 유지 - 선택 기능 필요) ---
 elif menu == "🛠️ 수정/삭제 (Edit)":
     st.markdown('<div class="main-header">🛠️ 안건 수정 및 삭제</div>', unsafe_allow_html=True)
     try:
@@ -321,10 +331,10 @@ elif menu == "🛠️ 수정/삭제 (Edit)":
                 task_options = target_df.apply(lambda x: f"[{x['입력일시']}] {str(x['업무내용'])[:20]}...", axis=1)
                 selected_task_idx = st.selectbox("안건을 선택하세요", task_options.index, format_func=lambda x: task_options[x])
                 selected_row = df.loc[selected_task_idx]
-                st.info(f"선택: {selected_row['업무내용']}")
                 
-                st.subheader("비밀번호 확인")
-                chk_pw = st.text_input("등록 시 입력한 비밀번호", type="password")
+                st.info(f"선택: {selected_row['업무내용']}")
+                chk_pw = st.text_input("비밀번호 확인", type="password")
+                
                 if st.button("확인"):
                     if str(selected_row.get('비밀번호', '')) == str(chk_pw):
                         st.session_state['auth_success'] = True
@@ -339,7 +349,6 @@ elif menu == "🛠️ 수정/삭제 (Edit)":
                     st.subheader("내용 수정")
                     with st.form("edit_form"):
                         def safe_index(lst, val): return lst.index(val) if val in lst else 0
-                        
                         e_type = st.selectbox("구분", ["주요현안", "일반보고", "협조요청"], index=safe_index(["주요현안", "일반보고", "협조요청"], selected_row['구분']))
                         e_status = st.selectbox("상태", ["진행중", "완료", "지연", "예정"], index=safe_index(["진행중", "완료", "지연", "예정"], selected_row['진행상태']))
                         e_content = st.text_area("업무 내용", value=selected_row['업무내용'])
@@ -350,7 +359,6 @@ elif menu == "🛠️ 수정/삭제 (Edit)":
                         with c2: delete_btn = st.form_submit_button("🗑️ 삭제하기")
                         
                         real_row_num = selected_task_idx + 2 
-                        
                         if update_btn:
                             sheet.update_cell(real_row_num, 3, e_type)
                             sheet.update_cell(real_row_num, 4, e_content)
@@ -367,7 +375,7 @@ elif menu == "🛠️ 수정/삭제 (Edit)":
     except Exception as e:
         st.error(f"오류: {e}")
 
-# --- [7] 기능 4: 지난 기록 ---
+# --- [10] 기능: 지난 기록 ---
 elif menu == "🗄️ 지난 기록 (History)":
     st.markdown('<div class="main-header">🗄️ 지난 회의 기록</div>', unsafe_allow_html=True)
     try:
@@ -384,18 +392,18 @@ elif menu == "🗄️ 지난 기록 (History)":
             history_df['부서명'] = pd.Categorical(history_df['부서명'], categories=DEPT_ORDER + others_hist, ordered=True)
             history_df = history_df.sort_values('부서명')
             
-            st.dataframe(history_df, use_container_width=True, hide_index=True)
+            # [변경] HTML 테이블로 교체
+            render_styled_table(history_df)
         else:
             st.warning("보관된 기록이 없습니다.")
     except Exception as e:
         st.error(f"오류: {e}")
 
-# --- [8] 기능 5: 회의록 다운로드 및 인쇄 ---
+# --- [11] 기능: 회의록 다운로드 ---
 elif menu == "🖨️ 회의록 다운로드 (Export)":
     st.markdown('<div class="main-header">🖨️ 회의록 생성 및 다운로드</div>', unsafe_allow_html=True)
     
     export_target = st.radio("출력할 대상을 선택하세요:", ["금주 안건 (Current)", "지난 기록 (History)"], horizontal=True)
-    
     target_df = pd.DataFrame()
     report_title = ""
 
@@ -414,8 +422,6 @@ elif menu == "🖨️ 회의록 다운로드 (Export)":
                 selected_date = st.selectbox("출력할 회차를 선택하세요:", meeting_dates)
                 target_df = all_hist_df[all_hist_df['회차정보'] == selected_date]
                 report_title = f"{selected_date} 회의록"
-            else:
-                st.warning("저장된 지난 기록이 없습니다.")
         
         if not target_df.empty:
             unique_depts = target_df['부서명'].unique()
@@ -429,7 +435,8 @@ elif menu == "🖨️ 회의록 다운로드 (Export)":
 
             st.divider()
             st.subheader(f"📄 미리보기: {report_title}")
-            st.dataframe(final_df, use_container_width=True, hide_index=True)
+            # [변경] HTML 테이블로 교체
+            render_styled_table(final_df)
 
             c1, c2 = st.columns(2)
             with c1:
@@ -443,8 +450,7 @@ elif menu == "🖨️ 회의록 다운로드 (Export)":
                 )
             with c2:
                 st.markdown("### 🖨️ 인쇄 / PDF 저장")
-                
-                html_table = final_df.to_html(index=False, classes='report-table')
+                html_table = final_df.to_html(index=False, classes='kiwu-table', escape=False)
                 html_content = f"""
                 <html>
                 <head>
@@ -458,11 +464,11 @@ elif menu == "🖨️ 회의록 다운로드 (Export)":
                             background-color: #f2f2f2; 
                             text-align: center !important; 
                             font-weight: 900 !important; 
-                            font-size: 16px !important; 
-                            color: #000;
+                            font-size: 18px !important; 
+                            color: #003478;
                             padding: 10px;
                         }}
-                        td {{ text-align: center; }}
+                        td {{ text-align: center; font-size: 14px; }}
                         td:nth-child(3) {{ text-align: left; }}
                     </style>
                 </head>
@@ -476,51 +482,42 @@ elif menu == "🖨️ 회의록 다운로드 (Export)":
                 with st.expander("👁️ 인쇄용 뷰 열기 (클릭)"):
                     st.components.v1.html(html_content, height=600, scrolling=True)
                     st.info("💡 위 표 위에서 마우스 오른쪽 버튼 -> '프레임 인쇄' 또는 이 화면 전체를 'Ctrl+P'로 인쇄하세요.")
-
     except Exception as e:
         st.error(f"데이터 처리 중 오류 발생: {e}")
 
-# --- [9] 기능 6: 관리자 ---
+# --- [12] 기능: 관리자 ---
 elif menu == "⚙️ 관리자 (Admin)":
     st.markdown('<div class="main-header">⚙️ 관리자 페이지</div>', unsafe_allow_html=True)
-    password = st.text_input("관리자 비밀번호를 입력하세요.", type="password")
+    password = st.text_input("관리자 비밀번호", type="password")
 
     try:
-        if "admin" in st.secrets:
-            real_password = st.secrets["admin"]["password"]
-        else:
-            real_password = "1234"
-    except Exception:
+        real_password = st.secrets["admin"]["password"] if "admin" in st.secrets else "1234"
+    except:
         real_password = "1234"
     
     if password == real_password:
-        st.success("✅ 관리자 모드 접속 완료")
-        
+        st.success("✅ 접속 완료")
         st.markdown("""
         <div class="admin-box">
             <h4>🔴 주간 회의 마감 (Data Closing)</h4>
-            <p>이 버튼을 누르면 <b>[Current]</b>의 모든 데이터가 <b>[History]</b>로 이동하고,<br>
-            <b>[Current]</b> 시트는 <b>초기화</b>되어 다음 주 입력을 받을 준비를 합니다.</p>
+            <p><b>[Current]</b> 데이터를 <b>[History]</b>로 이동하고 초기화합니다.</p>
         </div>
         """, unsafe_allow_html=True)
         
-        meeting_name = st.text_input("이번 마감할 회차 이름을 입력하세요 (예: 2026-01-08 정기회의)")
-        confirm_close = st.checkbox("⚠️ 정말로 이번 주 데이터를 마감하고 초기화하시겠습니까?")
+        meeting_name = st.text_input("마감할 회차 이름 (예: 2026-01-08 정기회의)")
+        confirm_close = st.checkbox("⚠️ 데이터 마감 확인")
         
-        if st.button("🚀 마감 실행 및 데이터 이관"):
-            if not confirm_close:
-                st.error("위의 '마감 확인' 체크박스를 먼저 선택해주세요!")
-            elif not meeting_name:
-                st.warning("회차 이름을 먼저 입력해주세요!")
+        if st.button("🚀 마감 실행"):
+            if not confirm_close or not meeting_name:
+                st.warning("회차 이름과 확인 체크박스를 모두 입력해주세요.")
             else:
                 try:
                     cur_sheet = get_google_sheet("Current")
                     his_sheet = get_google_sheet("History")
-                    
                     data = cur_sheet.get_all_values()
                     
                     if len(data) <= 1:
-                        st.warning("이관할 데이터가 없습니다.")
+                        st.warning("데이터 없음")
                     else:
                         records = data[1:]
                         history_records = []
@@ -528,14 +525,11 @@ elif menu == "⚙️ 관리자 (Admin)":
                             safe_row = row[:-1]
                             safe_row.insert(0, meeting_name)
                             history_records.append(safe_row)
-                        
                         his_sheet.append_rows(history_records)
                         cur_sheet.batch_clear(["A2:Z1000"])
-                        
                         st.balloons()
-                        st.success(f"✅ [{meeting_name}] 마감이 완료되었습니다!")
+                        st.success("✅ 마감 완료")
                 except Exception as e:
-                    st.error(f"마감 중 오류 발생: {e}")
-    
+                    st.error(f"오류: {e}")
     elif password:
-        st.error("비밀번호가 틀렸습니다.")
+        st.error("비밀번호 불일치")
