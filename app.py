@@ -3,6 +3,7 @@ import pandas as pd
 import gspread
 from datetime import datetime
 from io import BytesIO
+import os # 파일 존재 여부 확인용
 
 # [필수] 워드 파일 생성을 위한 라이브러리
 from docx import Document
@@ -68,22 +69,22 @@ st.markdown("""
         background-color: white;
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
-    /* 헤더 스타일 (사용자 요청 사항: 가운데, 볼드, 크게) */
+    /* 헤더 스타일 */
     table.kiwu-table th {
         background-color: #f0f2f6;
         color: #003478;
-        font-size: 15px;       /* 글자 크기 키움 */
-        font-weight: 600;      /* 아주 굵게 */
-        text-align: center;    /* 가운데 정렬 */
+        font-size: 15px;       
+        font-weight: 900;      
+        text-align: center;    
         padding: 15px 10px;
-        border-bottom: 3px solid #003478; /* 하단 파란줄 */
+        border-bottom: 3px solid #003478; 
         white-space: nowrap;
     }
     /* 데이터 셀 스타일 */
     table.kiwu-table td {
         padding: 12px 10px;
         border-bottom: 1px solid #e2e8f0;
-        text-align: center;    /* 기본 가운데 정렬 */
+        text-align: center;    
         font-size: 15px;
         color: #333;
     }
@@ -121,13 +122,7 @@ def get_google_sheet(sheet_name):
 
 # --- [3] 스타일링된 HTML 테이블 생성 함수 ---
 def render_styled_table(df):
-    """
-    Pandas DataFrame을 예쁜 HTML 테이블로 변환하여 렌더링합니다.
-    st.dataframe 대신 사용하여 스타일을 강제합니다.
-    """
-    # HTML 변환
     html = df.to_html(index=False, classes='kiwu-table', escape=False)
-    # 컨테이너로 감싸서 출력
     st.markdown(f'<div class="kiwu-table-container">{html}</div>', unsafe_allow_html=True)
 
 # --- [4] 워드 파일 생성 함수 ---
@@ -172,17 +167,21 @@ def create_docx(df, title_text):
 @st.dialog("🔍 전체 안건 확대 보기", width="large")
 def show_fullscreen_table(df):
     st.markdown("### 📋 전체 안건 목록")
-    render_styled_table(df) # 여기도 HTML 테이블 사용
+    render_styled_table(df) 
     if st.button("닫기"):
         st.rerun()
 
-# --- [6] 사이드바 메뉴 ---
+# --- [6] 사이드바 메뉴 (로고 적용 부분) ---
 with st.sidebar:
-    try:
-        st.image("https://upload.wikimedia.org/wikipedia/commons/2/25/Gyeongin_Women%27s_University_Emblem.png", width=80)
-    except:
-        st.write("KIWU")
-    st.title("KIWU Admin")
+    # [수정] 로고 이미지 표시 로직 (파일이 있으면 이미지, 없으면 텍스트)
+    # logo.png 파일이 프로젝트 폴더에 있어야 합니다.
+    if os.path.exists("logo.png"):
+        st.image("logo.png", use_container_width=True)
+    elif os.path.exists("logo.jpg"):
+        st.image("logo.jpg", use_container_width=True)
+    else:
+        # 이미지가 없으면 텍스트로 깔끔하게 표시
+        st.markdown("## 🎓 KIWU Admin")
     
     menu = st.radio("메뉴 선택", [
         "📊 금주 현황 (Current)", 
@@ -261,10 +260,8 @@ if menu == "📊 금주 현황 (Current)":
                 filtered_df['부서명'] = pd.Categorical(filtered_df['부서명'], categories=DEPT_ORDER + others, ordered=True)
                 filtered_df = filtered_df.sort_values('부서명')
                 
-                # 비밀번호 컬럼 제외
                 display_df = filtered_df.drop(columns=['비밀번호']) if '비밀번호' in filtered_df.columns else filtered_df
 
-                # [변경] st.dataframe 대신 커스텀 HTML 테이블 사용
                 render_styled_table(display_df)
 
                 with col_btn:
@@ -313,7 +310,7 @@ elif menu == "📝 안건 등록 (Input)":
                 except Exception as e:
                     st.error(f"저장 실패: {e}")
 
-# --- [9] 기능: 수정/삭제 (여기는 데이터프레임 유지 - 선택 기능 필요) ---
+# --- [9] 기능: 수정/삭제 ---
 elif menu == "🛠️ 수정/삭제 (Edit)":
     st.markdown('<div class="main-header">🛠️ 안건 수정 및 삭제</div>', unsafe_allow_html=True)
     try:
@@ -392,7 +389,6 @@ elif menu == "🗄️ 지난 기록 (History)":
             history_df['부서명'] = pd.Categorical(history_df['부서명'], categories=DEPT_ORDER + others_hist, ordered=True)
             history_df = history_df.sort_values('부서명')
             
-            # [변경] HTML 테이블로 교체
             render_styled_table(history_df)
         else:
             st.warning("보관된 기록이 없습니다.")
@@ -435,7 +431,6 @@ elif menu == "🖨️ 회의록 다운로드 (Export)":
 
             st.divider()
             st.subheader(f"📄 미리보기: {report_title}")
-            # [변경] HTML 테이블로 교체
             render_styled_table(final_df)
 
             c1, c2 = st.columns(2)
